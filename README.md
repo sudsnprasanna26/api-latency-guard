@@ -1,6 +1,7 @@
 # API Latency Guard
+API Latency Guard allows you to compare baseline and candidate API deployments in CI and detect p95 latency and error-rate regressions before production.
 
-API Latency Guard is a GitHub Action that detects API latency and error-rate regressions before they reach production.
+[Use this action] [View demo] [Read documentation]
 
 It compares the same GET endpoint on a baseline deployment and a candidate deployment, then fails the workflow when the candidate exceeds the configured p95 latency or error-rate threshold. The Action uses bounded concurrency, per-request timeouts, and sequential target execution to keep comparisons controlled and understandable.
 
