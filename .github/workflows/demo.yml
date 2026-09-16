@@ -1,0 +1,120 @@
+name: Demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-local-apis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build local Action
+        run: npm run build
+
+      - name: Start baseline and slow candidate
+        shell: bash
+        run: |
+          node --import tsx demo/server.ts --port 3001 --delay 25 --error-rate 0 > baseline-server.log 2>&1 &
+          echo "BASELINE_PID=$!" >> "$GITHUB_ENV"
+          node --import tsx demo/server.ts --port 3002 --delay 100 --error-rate 0 > candidate-server.log 2>&1 &
+          echo "SLOW_CANDIDATE_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for initial servers
+        shell: bash
+        run: |
+          baseline_ready=0
+          candidate_ready=0
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3001/health > /dev/null; then
+              baseline_ready=1
+            fi
+            if curl --fail --silent http://127.0.0.1:3002/health > /dev/null; then
+              candidate_ready=1
+            fi
+            if [[ "$baseline_ready" -eq 1 && "$candidate_ready" -eq 1 ]]; then
+              break
+            fi
+            sleep 1
+          done
+          [[ "$baseline_ready" -eq 1 && "$candidate_ready" -eq 1 ]]
+
+      - name: Detect intentional regression
+        id: regression
+        continue-on-error: true
+        uses: ./
+        with:
+          baseline-url: http://127.0.0.1:3001
+          candidate-url: http://127.0.0.1:3002
+          endpoint: /api/test
+          requests: 20
+          concurrency: 4
+          warmup: 3
+          max-p95-regression: 20
+          max-error-rate: 1
+
+      - name: Assert regression was detected
+        shell: bash
+        run: |
+          if [[ "${{ steps.regression.outcome }}" != "failure" ]]; then
+            echo "Expected the regression scenario to fail."
+            exit 1
+          fi
+
+      - name: Replace candidate with passing server
+        shell: bash
+        run: |
+          kill "$SLOW_CANDIDATE_PID"
+          wait "$SLOW_CANDIDATE_PID" || true
+          node --import tsx demo/server.ts --port 3002 --delay 28 --error-rate 0 > passing-server.log 2>&1 &
+          echo "PASSING_CANDIDATE_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for passing candidate
+        shell: bash
+        run: |
+          candidate_ready=0
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3002/health > /dev/null; then
+              candidate_ready=1
+              break
+            fi
+            sleep 1
+          done
+          [[ "$candidate_ready" -eq 1 ]]
+
+      - name: Verify similar-speed candidate passes
+        uses: ./
+        with:
+          baseline-url: http://127.0.0.1:3001
+          candidate-url: http://127.0.0.1:3002
+          endpoint: /api/test
+          requests: 20
+          concurrency: 4
+          warmup: 3
+          max-p95-regression: 30
+          max-error-rate: 1
+
+      - name: Stop demo servers
+        if: always()
+        shell: bash
+        run: |
+          for variable_name in PASSING_CANDIDATE_PID SLOW_CANDIDATE_PID BASELINE_PID; do
+            pid="${!variable_name:-}"
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+              kill "$pid"
+              wait "$pid" || true
+            fi
+          done

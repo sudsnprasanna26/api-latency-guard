@@ -1,0 +1,33 @@
+{
+  "name": "api-latency-guard",
+  "version": "0.1.0",
+  "description": "Detect API latency and error-rate regressions before they reach production.",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sudsnprasanna26/api-latency-guard.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": "24.x",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx demo/server.ts"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "@vercel/ncc": "0.45.0",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

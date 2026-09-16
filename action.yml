@@ -1,0 +1,63 @@
+name: API Latency Guard
+description: Detect API latency and error-rate regressions before they reach production.
+author: sudsnprasanna26
+inputs:
+  baseline-url:
+    description: Base URL for the existing or production API.
+    required: true
+  candidate-url:
+    description: Base URL for the proposed or preview API.
+    required: true
+  endpoint:
+    description: Relative endpoint path to benchmark.
+    required: false
+    default: "/"
+  requests:
+    description: Number of measured requests per target.
+    required: false
+    default: "50"
+  concurrency:
+    description: Maximum concurrent requests per target.
+    required: false
+    default: "5"
+  warmup:
+    description: Number of unmeasured warmup requests per target.
+    required: false
+    default: "5"
+  timeout:
+    description: Per-request timeout in milliseconds.
+    required: false
+    default: "5000"
+  max-p95-regression:
+    description: Maximum permitted candidate p95 latency regression percentage.
+    required: false
+    default: "20"
+  max-error-rate:
+    description: Maximum permitted candidate error-rate percentage.
+    required: false
+    default: "1"
+  headers-json:
+    description: JSON object of string headers sent to both targets.
+    required: false
+    default: "{}"
+outputs:
+  result:
+    description: Whether the candidate passed or failed the configured thresholds.
+  baseline-p95-ms:
+    description: Baseline p95 latency in milliseconds, or an empty string if unavailable.
+  candidate-p95-ms:
+    description: Candidate p95 latency in milliseconds, or an empty string if unavailable.
+  p95-regression-percent:
+    description: Candidate p95 regression percentage, or an empty string if unavailable.
+  baseline-error-rate-percent:
+    description: Baseline error-rate percentage.
+  candidate-error-rate-percent:
+    description: Candidate error-rate percentage.
+  report-path:
+    description: Path to the generated JSON performance report.
+runs:
+  using: node24
+  main: dist/index.js
+branding:
+  icon: activity
+  color: blue
